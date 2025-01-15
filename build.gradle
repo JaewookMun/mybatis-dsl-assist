@@ -1,0 +1,24 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.github.jaewookmun'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+//    implementation 'org.mybatis:mybatis:3.5.13'
+    implementation 'org.mybatis.dynamic-sql:mybatis-dynamic-sql:1.5.0'
+//    implementation 'com.google.auto.service:auto-service:1.1.1'
+    implementation 'com.squareup:javapoet:1.11.1'
+
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+test {
+    useJUnitPlatform()
+}
