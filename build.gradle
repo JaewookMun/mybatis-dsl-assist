@@ -10,7 +10,7 @@ repositories {
 }
 
 dependencies {
-//    implementation 'org.mybatis:mybatis:3.5.13'
+    implementation 'org.mybatis:mybatis:3.5.13'
     implementation 'org.mybatis.dynamic-sql:mybatis-dynamic-sql:1.5.0'
 //    implementation 'com.google.auto.service:auto-service:1.1.1'
     implementation 'com.squareup:javapoet:1.11.1'
