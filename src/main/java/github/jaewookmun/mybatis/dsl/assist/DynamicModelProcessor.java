@@ -68,9 +68,6 @@ public class DynamicModelProcessor extends AbstractProcessor {
         String packageName = elementUtils.getPackageOf(element).getQualifiedName().toString();
         String entityModelName = element.getSimpleName().toString();
 
-        DynamicModel modelAnnotation = element.getAnnotation(DynamicModel.class);
-        String tableName = modelAnnotation.table().isEmpty() ? getTableNameFrom(entityModelName) : modelAnnotation.table();
-
         // 1. Default Mapper interface
         TypeSpec.Builder defaultMapper = TypeSpec.interfaceBuilder(entityModelName + "MyBatisDSLMapper")
                 .addSuperinterface(CommonCountMapper.class)
@@ -122,7 +119,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
 
         List<MethodSpec> selectMethodList = generateSelectMethods(element, entityModelName, tableFieldName);
 
-        selectMethodList.forEach(select -> defaultMapper.addMethod(select));
+        selectMethodList.forEach(defaultMapper::addMethod);
 
         // TODO : ADD update method
 
@@ -219,8 +216,8 @@ public class DynamicModelProcessor extends AbstractProcessor {
 
         selectMethodList.add(secondSelectOne);
 
-        // id가 존재할 경우
-        if (!element.getEnclosedElements().stream().filter(e -> e.getSimpleName().toString().equals("id")).collect(Collectors.toList()).isEmpty()) {
+        // id가 존재할 경우 - TODO: 추후 어노테이션 활용으로 교체
+        if (element.getEnclosedElements().stream().anyMatch(e -> e.getSimpleName().toString().equals("id"))) {
 
             /*
                 default Optional<PersonRecord> findById(Integer recordId) {
