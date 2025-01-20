@@ -11,13 +11,12 @@ import org.mybatis.dynamic.sql.AliasableSqlTable;
 import org.mybatis.dynamic.sql.BasicColumn;
 import org.mybatis.dynamic.sql.SqlBuilder;
 import org.mybatis.dynamic.sql.SqlColumn;
+import org.mybatis.dynamic.sql.delete.DeleteDSLCompleter;
 import org.mybatis.dynamic.sql.select.SelectDSLCompleter;
 import org.mybatis.dynamic.sql.select.render.SelectStatementProvider;
+import org.mybatis.dynamic.sql.update.UpdateDSLCompleter;
 import org.mybatis.dynamic.sql.util.SqlProviderAdapter;
-import org.mybatis.dynamic.sql.util.mybatis3.CommonCountMapper;
-import org.mybatis.dynamic.sql.util.mybatis3.CommonInsertMapper;
-import org.mybatis.dynamic.sql.util.mybatis3.CommonUpdateMapper;
-import org.mybatis.dynamic.sql.util.mybatis3.MyBatis3Utils;
+import org.mybatis.dynamic.sql.util.mybatis3.*;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -76,6 +75,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
                         ClassName.get(element)
                 ))
                 .addSuperinterface(CommonUpdateMapper.class)
+                .addSuperinterface(CommonDeleteMapper.class)
                 .addModifiers(Modifier.PUBLIC);
 
         // 2. BasicColumn[] selectlist 필드 생성
@@ -118,10 +118,86 @@ public class DynamicModelProcessor extends AbstractProcessor {
         defaultMapper.addMethod(insertMethod);
 
         List<MethodSpec> selectMethodList = generateSelectMethods(element, entityModelName, tableFieldName);
-
         selectMethodList.forEach(defaultMapper::addMethod);
 
-        // TODO : ADD update method
+        // id가 존재할 경우 - TODO: 추후 어노테이션 활용으로 교체
+        if (element.getEnclosedElements().stream().anyMatch(e -> e.getSimpleName().toString().equals("id")))
+        {
+            /*
+                @Deprecated
+                default int update(UpdateDSLCompleter completer) {
+                    return MyBatis3Utils.update(this::update, person, completer);
+                }
+
+                default int updateByPrimaryKey(PersonRecord row) {
+                    return update(c -> c
+                            .set(firstName).equalToWhenPresent(row::getFirstName)
+                            .set(lastName).equalToWhenPresent(row::getLastName)
+                            .set(birthDate).equalToWhenPresent(row::getBirthDate)
+                            .set(employed).equalToWhenPresent(row::getEmployed)
+                            .set(occupation).equalToWhenPresent(row::getOccupation)
+                            .set(addressId).equalToWhenPresent(row::getAddressId)
+                            .where(id, SqlBuilder.isEqualTo(row::getId))
+                    );
+                }
+             */
+
+            MethodSpec deprecatedUpdate = MethodSpec.methodBuilder("update")
+                    .addAnnotation(AnnotationSpec.builder(Deprecated.class).build())
+                    .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
+                    .returns(TypeName.INT)
+                    .addParameter(UpdateDSLCompleter.class, "completer")
+                    .addCode("return $T.update(this::update, $T.$L, completer);\n",
+                            ClassName.get(MyBatis3Utils.class),
+                            ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
+                            tableFieldName)
+                    .build();
+            defaultMapper.addMethod(deprecatedUpdate);
+
+            String recordParamName = "row";
+            MethodSpec updateByPrimaryKey = MethodSpec.methodBuilder("updateByPrimaryKey")
+                    .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
+                    .returns(TypeName.INT)
+                    .addParameter(ClassName.get(element), recordParamName)
+                    .addCode("return update(c -> c\n")
+                    .addCode(generateUpdateMapping(element, entityModelName, recordParamName))
+                    .addCode(");\n")
+                    .build();
+            defaultMapper.addMethod(updateByPrimaryKey);
+
+            /*
+                @Deprecated
+                default int delete(DeleteDSLCompleter completer) {
+                    return MyBatis3Utils.deleteFrom(this::delete, person, completer);
+                }
+
+                default int deleteByPrimaryKey(Integer recordId) {
+                    return delete(c -> c.where(id, SqlBuilder.isEqualTo(recordId)));
+                }
+             */
+            MethodSpec deprecatedDelete = MethodSpec.methodBuilder("delete")
+                    .addAnnotation(AnnotationSpec.builder(Deprecated.class).build())
+                    .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
+                    .returns(TypeName.INT)
+                    .addParameter(DeleteDSLCompleter.class, "completer")
+                    .addCode("return $T.deleteFrom(this::delete, $T.$L, completer);\n",
+                            ClassName.get(MyBatis3Utils.class),
+                            ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
+                            tableFieldName)
+                    .build();
+            defaultMapper.addMethod(deprecatedDelete);
+
+            MethodSpec deleteByPrimaryKey = MethodSpec.methodBuilder("deleteByPrimaryKey")
+                    .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
+                    .returns(TypeName.INT)
+                    .addParameter(Integer.class, "recordId")
+                    .addCode("return delete(c -> c.where($T.$L, $T.isEqualTo(recordId)));\n",
+                            ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
+                            "id",
+                            ClassName.get(SqlBuilder.class))
+                    .build();
+            defaultMapper.addMethod(deleteByPrimaryKey);
+        }
 
         JavaFile javaFile = JavaFile.builder(packageName, defaultMapper.build()).build();
 
@@ -131,6 +207,28 @@ public class DynamicModelProcessor extends AbstractProcessor {
         } catch (IOException e) {
             messager.printMessage(Diagnostic.Kind.ERROR, "failed to create DefaultMapper file: " + e.getMessage());
         }
+    }
+
+    private CodeBlock generateUpdateMapping(TypeElement classElement, String entityModelName, String row)
+    {
+        CodeBlock.Builder builder = CodeBlock.builder();
+
+        for (Element field : classElement.getEnclosedElements()) {
+            if (field.getKind() != ElementKind.FIELD || field.getModifiers().contains(Modifier.STATIC)) continue;
+
+            String fieldName = field.getSimpleName().toString();
+
+            if (fieldName.equals("id")) continue;
+            builder.add(".set($T.$L).equalToWhenPresent(" + row + "::get" + toPascalCase(fieldName) + ")",
+                    ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
+                    fieldName);
+        }
+        builder.add(".where($T.$L, $T.isEqualTo(" + row + "::get" + toPascalCase("id") + "))",
+                ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
+                "id",
+                ClassName.get(SqlBuilder.class));
+
+        return builder.build();
     }
 
     private List<MethodSpec> generateSelectMethods(TypeElement element, String entityModelName, String tableFieldName) {
@@ -489,6 +587,10 @@ public class DynamicModelProcessor extends AbstractProcessor {
     private String toCamelCase(String className) {
 
         return Character.toLowerCase(className.charAt(0)) + className.substring(1);
+    }
+
+    private String toPascalCase(String className) {
+        return Character.toUpperCase(className.charAt(0)) + className.substring(1);
     }
 
     protected String getTableNameFrom(String className) {
