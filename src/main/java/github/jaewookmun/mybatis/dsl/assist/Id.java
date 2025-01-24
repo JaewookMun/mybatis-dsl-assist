@@ -5,8 +5,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target(ElementType.TYPE)
+@Target(ElementType.FIELD)
 @Retention(RetentionPolicy.SOURCE)
-public @interface DynamicModel {
-    String table() default "";
+public @interface Id {
+    boolean isGeneratedKey() default false;
 }
