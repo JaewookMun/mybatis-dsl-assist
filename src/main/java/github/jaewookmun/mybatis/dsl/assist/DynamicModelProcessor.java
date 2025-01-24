@@ -21,6 +21,7 @@ import org.mybatis.dynamic.sql.util.mybatis3.*;
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic;
 import java.io.IOException;
@@ -219,7 +220,10 @@ public class DynamicModelProcessor extends AbstractProcessor {
             String fieldName = field.getSimpleName().toString();
 
             if (fieldName.equals("id")) continue;
-            builder.add(".set($T.$L).equalToWhenPresent(" + row + "::get" + toPascalCase(fieldName) + ")",
+            String getter = "get";
+            if (field.asType().getKind().equals(TypeKind.BOOLEAN)) getter = "is";
+
+            builder.add(".set($T.$L).equalToWhenPresent(" + row + "::" + getter + toPascalCase(fieldName) + ")",
                     ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
                     fieldName);
         }
