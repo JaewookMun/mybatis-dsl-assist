@@ -223,7 +223,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
             String getter = "get";
             if (field.asType().getKind().equals(TypeKind.BOOLEAN)) getter = "is";
 
-            builder.add(".set($T.$L).equalToWhenPresent(" + row + "::" + getter + toPascalCase(fieldName) + ")",
+            builder.add(".set($T.$L).equalToWhenPresent(" + row + "::" + getter + toPascalCase(fieldName) + ")\n",
                     ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
                     fieldName);
         }
