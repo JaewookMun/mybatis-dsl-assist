@@ -130,7 +130,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
                     return MyBatis3Utils.update(this::update, person, completer);
                 }
 
-                default int updateByPrimaryKey(PersonRecord row) {
+                default int updateById(PersonRecord row) {
                     return update(c -> c
                             .set(firstName).equalToWhenPresent(row::getFirstName)
                             .set(lastName).equalToWhenPresent(row::getLastName)
@@ -156,7 +156,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
             defaultMapper.addMethod(deprecatedUpdate);
 
             String recordParamName = "row";
-            MethodSpec updateByPrimaryKey = MethodSpec.methodBuilder("updateByPrimaryKey")
+            MethodSpec updateById = MethodSpec.methodBuilder("updateById")
                     .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
                     .returns(TypeName.INT)
                     .addParameter(ClassName.get(element), recordParamName)
@@ -164,7 +164,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
                     .addCode(generateUpdateMapping(element, entityModelName, recordParamName))
                     .addCode(");\n")
                     .build();
-            defaultMapper.addMethod(updateByPrimaryKey);
+            defaultMapper.addMethod(updateById);
 
             /*
                 @Deprecated
@@ -172,7 +172,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
                     return MyBatis3Utils.deleteFrom(this::delete, person, completer);
                 }
 
-                default int deleteByPrimaryKey(Integer recordId) {
+                default int deleteById(Integer recordId) {
                     return delete(c -> c.where(id, SqlBuilder.isEqualTo(recordId)));
                 }
              */
@@ -188,7 +188,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
                     .build();
             defaultMapper.addMethod(deprecatedDelete);
 
-            MethodSpec deleteByPrimaryKey = MethodSpec.methodBuilder("deleteByPrimaryKey")
+            MethodSpec deleteById = MethodSpec.methodBuilder("deleteById")
                     .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
                     .returns(TypeName.INT)
                     .addParameter(Integer.class, "recordId")
@@ -197,7 +197,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
                             "id",
                             ClassName.get(SqlBuilder.class))
                     .build();
-            defaultMapper.addMethod(deleteByPrimaryKey);
+            defaultMapper.addMethod(deleteById);
         }
 
         JavaFile javaFile = JavaFile.builder(packageName, defaultMapper.build()).build();
