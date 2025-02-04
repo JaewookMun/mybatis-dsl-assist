@@ -8,5 +8,5 @@ import java.lang.annotation.Target;
 @Target(ElementType.FIELD)
 @Retention(RetentionPolicy.SOURCE)
 public @interface Id {
-    boolean isGeneratedKey() default false;
+    boolean useGeneratedKeys() default false;
 }

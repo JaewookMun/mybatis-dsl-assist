@@ -2,16 +2,14 @@ package github.jaewookmun.mybatis.dsl.assist;
 
 
 import com.squareup.javapoet.*;
-import org.apache.ibatis.annotations.Result;
-import org.apache.ibatis.annotations.ResultMap;
-import org.apache.ibatis.annotations.Results;
-import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.*;
 import org.apache.ibatis.type.JdbcType;
 import org.mybatis.dynamic.sql.AliasableSqlTable;
 import org.mybatis.dynamic.sql.BasicColumn;
 import org.mybatis.dynamic.sql.SqlBuilder;
 import org.mybatis.dynamic.sql.SqlColumn;
 import org.mybatis.dynamic.sql.delete.DeleteDSLCompleter;
+import org.mybatis.dynamic.sql.insert.render.InsertStatementProvider;
 import org.mybatis.dynamic.sql.select.SelectDSLCompleter;
 import org.mybatis.dynamic.sql.select.render.SelectStatementProvider;
 import org.mybatis.dynamic.sql.update.UpdateDSLCompleter;
@@ -90,6 +88,47 @@ public class DynamicModelProcessor extends AbstractProcessor {
         defaultMapper.addField(selectListField);
 
         // 3. default methods - CRUD (create, read, update, delete)
+
+        /*
+            @InsertProvider(type = SqlProviderAdapter.class, method = "insert")
+            @Options(useGeneratedKeys = true, keyProperty = "row.id")
+            @Override
+            int insert(InsertStatementProvider<PersonRecord> insertStatement);
+        */
+        Optional<Id> useGeneratedKey = element.getEnclosedElements().stream()
+                .filter(e -> e.getAnnotation(Id.class) != null)
+                .map(e -> e.getAnnotation(Id.class))
+                .filter(Id::useGeneratedKeys)
+                .findFirst();
+
+        if (useGeneratedKey.isPresent()) {
+            Element idField = element.getEnclosedElements().stream()
+                    .filter(e -> e.getAnnotation(Id.class) != null)
+                    .findFirst()
+                    .get();
+
+            MethodSpec insertUsingGeneratedKey = MethodSpec.methodBuilder("insert")
+                    .addAnnotation(AnnotationSpec.builder(InsertProvider.class)
+                            .addMember("type", "$T.class", SqlProviderAdapter.class)
+                            .addMember("method", "$S", "insert")
+                            .build()
+                    )
+                    .addAnnotation(AnnotationSpec.builder(Options.class)
+                            .addMember("useGeneratedKeys", "$L", true)
+                            .addMember("keyProperty", "$S", "row." + idField.getSimpleName())
+                            .build()
+                    )
+                    .addAnnotation(AnnotationSpec.builder(Override.class).build())
+                    .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+                    .returns(TypeName.INT)
+                    .addParameter(ParameterizedTypeName.get(
+                            ClassName.get(InsertStatementProvider.class),
+                            ClassName.get(element)
+                    ), "insertStatement")
+                    .build();
+
+            defaultMapper.addMethod(insertUsingGeneratedKey);
+        }
 
         /*
             default int insert(PersonRecord row) {
@@ -193,8 +232,8 @@ public class DynamicModelProcessor extends AbstractProcessor {
             MethodSpec deleteById = MethodSpec.methodBuilder("deleteById")
                     .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
                     .returns(TypeName.INT)
-                    .addParameter(Integer.class, "recordId")
-                    .addCode("return delete(c -> c.where($T.$L, $T.isEqualTo(recordId)));\n",
+                    .addParameter(Integer.class, "id")
+                    .addCode("return delete(c -> c.where($T.$L, $T.isEqualTo(id)));\n",
                             ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
                             idField.get().getSimpleName(),
                             ClassName.get(SqlBuilder.class))
