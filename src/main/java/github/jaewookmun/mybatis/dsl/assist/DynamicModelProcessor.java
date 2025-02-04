@@ -121,9 +121,11 @@ public class DynamicModelProcessor extends AbstractProcessor {
         List<MethodSpec> selectMethodList = generateSelectMethods(element, entityModelName, tableFieldName);
         selectMethodList.forEach(defaultMapper::addMethod);
 
-        // id가 존재할 경우 - TODO: 추후 어노테이션 활용으로 교체
-        if (element.getEnclosedElements().stream().anyMatch(e -> e.getSimpleName().toString().equals("id")))
-        {
+        Optional<? extends Element> idField = element.getEnclosedElements().stream()
+                .filter(e -> e.getAnnotation(Id.class) != null)
+                .findFirst();
+
+        if (idField.isPresent()) {
             /*
                 @Deprecated
                 default int update(UpdateDSLCompleter completer) {
@@ -194,7 +196,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
                     .addParameter(Integer.class, "recordId")
                     .addCode("return delete(c -> c.where($T.$L, $T.isEqualTo(recordId)));\n",
                             ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
-                            "id",
+                            idField.get().getSimpleName(),
                             ClassName.get(SqlBuilder.class))
                     .build();
             defaultMapper.addMethod(deleteById);
@@ -217,9 +219,10 @@ public class DynamicModelProcessor extends AbstractProcessor {
         for (Element field : classElement.getEnclosedElements()) {
             if (field.getKind() != ElementKind.FIELD || field.getModifiers().contains(Modifier.STATIC)) continue;
 
+            if (field.getAnnotation(Id.class) != null) continue;
+
             String fieldName = field.getSimpleName().toString();
 
-            if (fieldName.equals("id")) continue;
             String getter = "get";
             if (field.asType().getKind().equals(TypeKind.BOOLEAN)) getter = "is";
 
@@ -227,9 +230,14 @@ public class DynamicModelProcessor extends AbstractProcessor {
                     ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
                     fieldName);
         }
-        builder.add(".where($T.$L, $T.isEqualTo(" + row + "::get" + toPascalCase("id") + "))",
+        Element idField = classElement.getEnclosedElements().stream()
+                .filter(field -> field.getAnnotation(Id.class) != null)
+                .findFirst()
+                .get();
+
+        builder.add(".where($T.$L, $T.isEqualTo(" + row + "::get" + toPascalCase(idField.getSimpleName().toString()) + "))",
                 ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
-                "id",
+                idField.getSimpleName(),
                 ClassName.get(SqlBuilder.class));
 
         return builder.build();
@@ -318,8 +326,11 @@ public class DynamicModelProcessor extends AbstractProcessor {
 
         selectMethodList.add(secondSelectOne);
 
-        // id가 존재할 경우 - TODO: 추후 어노테이션 활용으로 교체
-        if (element.getEnclosedElements().stream().anyMatch(e -> e.getSimpleName().toString().equals("id"))) {
+        Optional<? extends Element> idField = element.getEnclosedElements().stream()
+                .filter(e -> e.getAnnotation(Id.class) != null)
+                .findFirst();
+
+        if (idField.isPresent()) {
 
             /*
                 default Optional<PersonRecord> findById(Integer recordId) {
@@ -332,11 +343,12 @@ public class DynamicModelProcessor extends AbstractProcessor {
                             ClassName.get(Optional.class),
                             ClassName.get(element)
                     ))
-                    .addParameter(Integer.class, "entityId")
-                    .addCode("return selectOne(c -> c.where($L, $T.isEqualTo(entityId)));\n",
-                            entityModelName + DYNAMIC_SQL_SUPPORT + ".id",
+                    .addParameter(Integer.class, "id")
+                    .addCode("return selectOne(c -> c.where($T.$L, $T.isEqualTo(id)));\n",
+                            ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
+                            idField.get().getSimpleName(),
                             ClassName.get(SqlBuilder.class)
-                            )
+                    )
                     .build();
 
             selectMethodList.add(findById);
@@ -398,8 +410,11 @@ public class DynamicModelProcessor extends AbstractProcessor {
                     .addMember("property", "$S", fieldName)
                     .addMember("jdbcType", "$T.$L", JdbcType.class, getJdbcType(TypeName.get(field.asType())));
 
-            // TODO: create @Id annotation
-            if (fieldName.equals("id")) {
+            Optional<? extends Element> idField = element.getEnclosedElements().stream()
+                    .filter(e -> e.getAnnotation(Id.class) != null)
+                    .findFirst();
+
+            if (idField.isPresent()) {
                 fieldMapper.addMember("id", "true");
             }
 
