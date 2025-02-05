@@ -455,11 +455,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
                     .addMember("property", "$S", fieldName)
                     .addMember("jdbcType", "$T.$L", JdbcType.class, getJdbcType(TypeName.get(field.asType())));
 
-            Optional<? extends Element> idField = element.getEnclosedElements().stream()
-                    .filter(e -> e.getAnnotation(Id.class) != null)
-                    .findFirst();
-
-            if (idField.isPresent()) {
+            if (field.getAnnotation(Id.class) != null) {
                 fieldMapper.addMember("id", "true");
             }
 
