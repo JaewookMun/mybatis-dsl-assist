@@ -109,16 +109,18 @@ public class DynamicModelProcessor extends AbstractProcessor {
 
             MethodSpec insertUsingGeneratedKey = MethodSpec.methodBuilder("insert")
                     .addAnnotation(AnnotationSpec.builder(InsertProvider.class)
-                            .addMember("type", "$T.class", SqlProviderAdapter.class)
-                            .addMember("method", "$S", "insert")
+                            .addMember("value",
+                                    CodeBlock.of("type = $T.class, method = $S", SqlProviderAdapter.class, "insert")
+                            )
                             .build()
                     )
                     .addAnnotation(AnnotationSpec.builder(Options.class)
-                            .addMember("useGeneratedKeys", "$L", true)
-                            .addMember("keyProperty", "$S", "row." + idField.getSimpleName())
+                            .addMember("value",
+                                    CodeBlock.of("useGeneratedKeys = $L, keyProperty = $S", true, "row." + idField.getSimpleName())
+                            )
                             .build()
                     )
-                    .addAnnotation(AnnotationSpec.builder(Override.class).build())
+                    .addAnnotation(Override.class)
                     .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
                     .returns(TypeName.INT)
                     .addParameter(ParameterizedTypeName.get(
@@ -241,7 +243,9 @@ public class DynamicModelProcessor extends AbstractProcessor {
             defaultMapper.addMethod(deleteById);
         }
 
-        JavaFile javaFile = JavaFile.builder(packageName, defaultMapper.build()).build();
+        JavaFile javaFile = JavaFile.builder(packageName, defaultMapper.build())
+                .indent("\t")
+                .build();
 
         try {
             javaFile.writeTo(filer);
@@ -265,7 +269,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
             String getter = "get";
             if (field.asType().getKind().equals(TypeKind.BOOLEAN)) getter = "is";
 
-            builder.add(".set($T.$L).equalToWhenPresent(" + row + "::" + getter + toPascalCase(fieldName) + ")\n",
+            builder.add("\t.set($T.$L).equalToWhenPresent(" + row + "::" + getter + toPascalCase(fieldName) + ")\n",
                     ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
                     fieldName);
         }
@@ -274,7 +278,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
                 .findFirst()
                 .get();
 
-        builder.add(".where($T.$L, $T.isEqualTo(" + row + "::get" + toPascalCase(idField.getSimpleName().toString()) + "))",
+        builder.add("\t.where($T.$L, $T.isEqualTo(" + row + "::get" + toPascalCase(idField.getSimpleName().toString()) + "))",
                 ClassName.get("", entityModelName + DYNAMIC_SQL_SUPPORT),
                 idField.getSimpleName(),
                 ClassName.get(SqlBuilder.class));
@@ -303,8 +307,9 @@ public class DynamicModelProcessor extends AbstractProcessor {
          */
         MethodSpec selectMany = MethodSpec.methodBuilder("selectMany")
                 .addAnnotation(AnnotationSpec.builder(SelectProvider.class)
-                        .addMember("type", "$T.class", SqlProviderAdapter.class)
-                        .addMember("method", "$S", "select")
+                        .addMember("value",
+                                CodeBlock.of("type = $T.class, method = $S", SqlProviderAdapter.class, "select")
+                        )
                         .build()
                 )
                 .addAnnotation(resultMap)
@@ -327,8 +332,9 @@ public class DynamicModelProcessor extends AbstractProcessor {
          */
         MethodSpec selectOne = MethodSpec.methodBuilder("selectOne")
                 .addAnnotation(AnnotationSpec.builder(SelectProvider.class)
-                        .addMember("type", "$T.class", SqlProviderAdapter.class)
-                        .addMember("method", "$S", "select")
+                        .addMember("value",
+                                CodeBlock.of("type = $T.class, method = $S", SqlProviderAdapter.class, "select")
+                        )
                         .build())
                 .addAnnotation(AnnotationSpec.builder(ResultMap.class)
                         .addMember("value", "$S", resultMapId)
@@ -562,7 +568,9 @@ public class DynamicModelProcessor extends AbstractProcessor {
             }
         }
 
-        JavaFile javaFile = JavaFile.builder(packageName, dynamicSqlSupport.build()).build();
+        JavaFile javaFile = JavaFile.builder(packageName, dynamicSqlSupport.build())
+                .indent("\t")
+                .build();
 
         try {
             javaFile.writeTo(filer);
