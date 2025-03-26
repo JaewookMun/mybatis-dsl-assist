@@ -261,6 +261,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
         CodeBlock.Builder builder = CodeBlock.builder();
 
         for (Element field : classElement.getEnclosedElements()) {
+            if (field.getAnnotation(Transient.class) != null) continue;
             if (field.getKind() != ElementKind.FIELD || field.getModifiers().contains(Modifier.STATIC)) continue;
 
             if (field.getAnnotation(Id.class) != null) continue;
