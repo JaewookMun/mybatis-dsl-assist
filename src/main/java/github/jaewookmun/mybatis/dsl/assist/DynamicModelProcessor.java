@@ -2,6 +2,7 @@ package github.jaewookmun.mybatis.dsl.assist;
 
 
 import com.squareup.javapoet.*;
+import github.jaewookmun.mybatis.dsl.Transient;
 import org.apache.ibatis.annotations.*;
 import org.apache.ibatis.type.JdbcType;
 import org.mybatis.dynamic.sql.AliasableSqlTable;
@@ -447,6 +448,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
                 .addMember("id", "$S", resultMapId);
 
         for (Element field : element.getEnclosedElements()) {
+            if (field.getAnnotation(Transient.class) != null) continue;
             if (field.getKind() != ElementKind.FIELD || field.getModifiers().contains(Modifier.STATIC)) continue;
 
             String fieldName = field.getSimpleName().toString();
@@ -469,6 +471,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
         CodeBlock.Builder builder = CodeBlock.builder();
 
         for (Element field : classElement.getEnclosedElements()) {
+            if (field.getAnnotation(Transient.class) != null) continue;
             if (field.getKind() != ElementKind.FIELD || field.getModifiers().contains(Modifier.STATIC)) continue;
 
             String fieldName = field.getSimpleName().toString();
@@ -482,6 +485,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
 
     private String generateColumnList(TypeElement classElement, String entityModelName) {
         return classElement.getEnclosedElements().stream()
+                .filter(e -> e.getAnnotation(Transient.class) == null)
                 .filter(e -> e.getKind() == ElementKind.FIELD)
                 .map(e -> entityModelName + DYNAMIC_SQL_SUPPORT + "." + e.getSimpleName().toString())
                 .collect(Collectors.joining(", "));
@@ -511,6 +515,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
                 );
 
         for (Element enclosed : element.getEnclosedElements()) {
+            if (enclosed.getAnnotation(Transient.class) != null) continue;
             if (enclosed.getKind() == ElementKind.FIELD) {
                 VariableElement field = (VariableElement) enclosed;
 
@@ -538,6 +543,7 @@ public class DynamicModelProcessor extends AbstractProcessor {
         dynamicSqlSupport.addField(modelInstance);
 
         for (Element enclosed : element.getEnclosedElements()) {
+            if (enclosed.getAnnotation(Transient.class) != null) continue;
             if (enclosed.getKind() == ElementKind.FIELD) {
                 VariableElement field = (VariableElement) enclosed;
 
